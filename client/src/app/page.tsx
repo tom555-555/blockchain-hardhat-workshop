@@ -10,6 +10,12 @@ type EchoDetailsProps = {
   value?: string
 }
 
+interface Echo {
+  address: string;
+  timestamp: Date;
+  message: string;
+}
+
 const buttonStyle = "flex w-full justify-center rounded-md px-3 py-1.5 text-sm font-semibold leading-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2";
 
 const EchoDetails: React.FC<EchoDetailsProps> = ({ title, value = "N/A" }) => (
@@ -22,15 +28,16 @@ const EchoDetails: React.FC<EchoDetailsProps> = ({ title, value = "N/A" }) => (
 )
 
 export default function Home() {
-  // userのパブリックウォレットを保存するために使用する状態変数
+  /**  userのパブリックウォレットを保存するために使用する状態変数 */
   const [currentAccount, setCurrentAccount] = useState<string | null>(null)
   console.log("currentAccount", currentAccount)
 
-  // ユーザーのメッセージを保存するために使用する状態変数
+  /** ユーザーのメッセージを保存するために使用する状態変数 */
   const [messageValue, setMessageValue] = useState<string>("")
+  const [latestEcho, setLatestEcho] = useState<Echo | null>(null)
 
   /** デプロイされたコントラクトのアドレスを保持する変数 */
-  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  const contractAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
 
   /** ABIの内容を参照する変数 */
   const contractABI = abi.abi
@@ -90,24 +97,26 @@ export default function Home() {
   const writeEcho = async () => {
     try {
       const {ethereum} = window as any
+      console.log({ ethereum })
       if (ethereum) {
         const provider = new ethers.BrowserProvider(ethereum)
         const signer = await provider.getSigner()
-        /*
-          ABIを参照する
-        */
+        /* ABIを参照する */
         const ethEchoContract = new ethers.Contract(
           contractAddress,
           contractABI,
           signer
         )
 
+        console.log({ ethEchoContract })
         let count = await ethEchoContract.getTotalEchoes()
-        console.log("Retrieved total echo count...: ", count.toNumber())
+        console.log("Retrieved total echo count...: ", Number(count))
         console.log("Signer: ", signer)
 
         /** コントラクトにEchoを書き込む */
-        const echoTxn = await ethEchoContract.writeEcho()
+        const echoTxn = await ethEchoContract.writeEcho(messageValue, {
+          gasLimit: 300000,
+        })
         console.log("Mining...: ", echoTxn.hash)
 
         await echoTxn.wait()
@@ -122,6 +131,38 @@ export default function Home() {
       console.log(error)
     }
   }
+
+ const getLatestEcho = async () => {
+    const { ethereum } = window as any;
+    try {
+      if (ethereum) {
+        const provider = new ethers.BrowserProvider(ethereum);
+        const signer = await provider.getSigner();
+        const ethEchoContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        );
+
+        /* コントラクトからgetLatestEchoメソッドを呼び出す */
+        const echo = await ethEchoContract.getLatestEcho();
+
+        /* UIに必要なのは、アドレス、タイムスタンプ、メッセージだけなので、以下のように設定する */
+        const newLatestEcho: Echo = {
+          address: echo.echoer,
+          timestamp: new Date(Number(echo.timestamp) * 1000),
+          message: echo.message,
+        };
+
+        /* React Stateにデータを格納する */
+        setLatestEcho(newLatestEcho);
+      } else {
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
 
   useEffect(() => {
@@ -158,7 +199,10 @@ export default function Home() {
                 Add Echo
               </button>
               {/* コントラクトのメッセージを表示する */}
-              <button className={`${buttonStyle} bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600 mt-6`}>
+              <button
+                className={`${buttonStyle} bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600 mt-6`}
+                onClick={getLatestEcho}
+              >
                 Load Echoes
               </button>
             </div>
@@ -173,21 +217,21 @@ export default function Home() {
 
           {/* 履歴を表示 */}
           {currentAccount &&
-            // latestEcho &&
+            latestEcho &&
             (
             <div className="py-3 px-4 block w-full border-gray-200 rounded-lg dark:bg-slate-900 dark:border-gray-700 dark:text-gray-100">
               <div>
                 <EchoDetails
                   title="Address"
-                  // value={latestEcho.address}
+                  value={latestEcho.address}
                 />
                 <EchoDetails
                   title="Time⏰"
-                  // value={latestEcho.timestamp.toString()}
+                  value={latestEcho.timestamp.toString()}
                 />
                 <EchoDetails
                   title="Message"
-                  // value={latestEcho.message}
+                  value={latestEcho.message}
                 />
               </div>
             </div>
