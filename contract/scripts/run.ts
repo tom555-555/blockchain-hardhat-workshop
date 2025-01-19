@@ -1,25 +1,25 @@
 import { ethers } from "hardhat";
 const main = async () => {
-  const [owner, randomPerson] = await ethers.getSigners();
   const echoContractFactory = await ethers.getContractFactory("EthEcho");
   const echoContract = await echoContractFactory.deploy();
-  const ethEcho = await echoContract.waitForDeployment();
 
-  const deployedContractAddress = await ethEcho.getAddress();
-  console.log("Contract deployed to:", deployedContractAddress);
-  console.log("Contract deployed by:", owner.address);
+  const deployedContractAddress = await echoContract.getAddress();
+  console.log("Contract added to:", deployedContractAddress);
 
-  await echoContract.getTotalEchoes();
+  /**
+   * Echoを送る
+   */
+  let echoTxn = await echoContract.writeEcho("A message!");
+  await echoTxn.wait(); // トランザクションが承認されるのを待つ（テスト:1回目）
 
-  let echoTxn = await echoContract.writeEcho();
-  await echoTxn.wait();
+  const [_, randomPerson] = await ethers.getSigners();
+  echoTxn = await echoContract
+    .connect(randomPerson)
+    .writeEcho("Another message!");
+  await echoTxn.wait(); // トランザクションが承認されるのを待つ（テスト:2回目）
 
-  await echoContract.getTotalEchoes();
-
-  echoTxn = await echoContract.connect(randomPerson).writeEcho();
-
-  await echoTxn.wait();
-  await echoContract.getTotalEchoes();
+  let latestEcho = await echoContract.getLatestEcho();
+  console.log(latestEcho);
 };
 
 const runMain = async () => {
